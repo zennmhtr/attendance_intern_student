@@ -1,0 +1,350 @@
+import { Card } from "@/Components/ui/card";
+import { MainLayout } from "@/Layouts/MainLayout";
+import {
+    currentTimeCode,
+    currentTimeGreeting,
+    requestNotificationPermission,
+    setLocalStorage,
+    ymdToIdDate,
+} from "@/Services/additionalService";
+import { PiStudentFill } from "react-icons/pi";
+import { HiBuildingStorefront } from "react-icons/hi2";
+import MenuListInDashboard, {
+    TableListInDashboard,
+} from "@/Components/custom/MenuListInDashboard";
+import { MenuItem } from "@/Types/menu";
+import clsx from "clsx";
+import { ApexBarChart, ChartNoData } from "@/Components/custom/Charts";
+import { useEffect, useState } from "react";
+import { Bell, Clock8, NotebookText } from "lucide-react";
+import { Supervisor } from "@/Types/supervisor";
+import { FaUserGear } from "react-icons/fa6";
+import { Attendance } from "@/Types/attendance";
+import { LuMapPinCheck } from "react-icons/lu";
+import BlastSonner, { BlastType } from "@/Components/custom/BlastSonner";
+
+type SupervisorDashboardProps = {
+    title?: string;
+    supervisor: Supervisor;
+    data: {
+        user_role: string;
+        default_location: {
+            latitude: number;
+            longitude: number;
+        };
+        attendances_daily: {
+            total_students: number;
+            attendances?: Attendance[];
+        };
+        attendances_month: {
+            month: string;
+            present: number;
+            excused: number;
+            absent: number;
+        }[];
+        latest_attendances: Attendance[];
+    };
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+    const getStatusConfig = (status: string) => {
+        switch (status) {
+            case "PRESENT":
+                return { label: "HADIR", className: "bg-green-100 text-green-700 border-green-200" };
+            case "EXCUSED":
+                return { label: "IZIN", className: "bg-yellow-100 text-yellow-700 border-yellow-200" };
+            default:
+                return { label: "ALPHA", className: "bg-red-100 text-red-700 border-red-200" };
+        }
+    };
+
+    const config = getStatusConfig(status);
+
+    return (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
+            {config.label}
+        </span>
+    );
+};
+
+export default function SupervisorDashboard({
+    title,
+    supervisor,
+    data,
+}: SupervisorDashboardProps) {
+    const [currentTime, setCurrentTime] = useState(new Date().toISOString());
+    const [grantedNotif, setGrantedNotif] = useState(
+        Notification.permission === "granted"
+    );
+    setLocalStorage("user_role", data.user_role);
+    setLocalStorage("default_latitude", data.default_location.latitude);
+    setLocalStorage("default_longitude", data.default_location.longitude);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date().toISOString());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (grantedNotif) {
+            requestNotificationPermission("supervisor");
+        }
+    }, []);
+
+    const hanldeRequestNotification = async () => {
+        const isGranted = await requestNotificationPermission("supervisor");
+        setGrantedNotif(isGranted);
+        BlastSonner({
+            message: isGranted ? "Notifikasi diizinkan" : "Notifikasi ditolak",
+            type: isGranted ? BlastType.SUCCESS : BlastType.ERROR,
+        });
+    };
+
+    const menuItems: MenuItem[] = [
+        {
+            icon: <PiStudentFill size={24} color="#36454F" />,
+            label: "Data Siswa Prakerin",
+            url: "/supervisor/student",
+        },
+        {
+            icon: <LuMapPinCheck size={24} color="#36454F" />,
+            label: "Absensi Siswa Prakerin",
+            url: "/supervisor/student/attendance",
+        },
+        {
+            icon: <NotebookText size={24} color="#36454F" />,
+            label: "Jurnal Siswa Prakerin",
+            url: "/supervisor/student/journal",
+        },
+        {
+            icon: <HiBuildingStorefront size={24} color="#36454F" />,
+            label: "Data Lokasi Prakerin",
+            url: "/supervisor/workshop",
+        },
+    ];
+
+    const chartColors = ["#22C55E", "#EAB308", "#EF4444"];
+
+    const attendance = {
+        categories: data.attendances_month?.map(
+            (attendance) => attendance.month
+        ),
+        series: [
+            {
+                name: "Hadir",
+                data: data.attendances_month?.map(
+                    (attendance) => attendance.present
+                ),
+            },
+            {
+                name: "Izin",
+                data: data.attendances_month?.map(
+                    (attendance) => attendance.excused
+                ),
+            },
+            {
+                name: "Alpha",
+                data: data.attendances_month?.map(
+                    (attendance) => attendance.absent
+                ),
+            },
+        ],
+    };
+
+    return (
+        <MainLayout title={title}>
+            <div className="w-full">
+                <div className="absolute top-0 left-0 w-full h-24 bg-blue-500 opacity-30 rounded-b-full z-0"></div>
+                <div className="z-10 relative mb-3 py-3">
+                    <Card className="flex p-3 flex-row w-full relative overflow-hidden shadow-md">
+                        <div
+                            className={clsx(
+                                "absolute -right-5 -bottom-0 w-2/3 h-full bg-gradient-to-r from-white",
+                                currentTimeCode() === "M" && "to-[#FFF8DC]",
+                                currentTimeCode() === "A" && "to-[#B0E0E6]",
+                                currentTimeCode() === "E" && "to-[#FFDAB9]",
+                                currentTimeCode() === "N" && "to-[#778899]"
+                            )}
+                        ></div>
+                        <div className="flex items-center mx-6 justify-center overflow-hidden relative">
+                            <div className="rounded-full p-4 bg-blue-100">
+                                <FaUserGear
+                                    className="text-blue-600 pl-1"
+                                    size={35}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-col justify-center relative">
+                            <h1 className="text-xl font-bold text-gray-800">
+                                Selamat {currentTimeGreeting()}
+                            </h1>
+                            <p className="text-lg text-gray-600">
+                                <b>{supervisor?.full_name}</b>
+                            </p>
+                        </div>
+                    </Card>
+                </div>
+                <div className="z-10 relative mb-3 pb-3">
+                    <Card className="flex p-3 flex-row w-full relative overflow-hidden shadow-md">
+                        <div
+                            className={clsx(
+                                "absolute -right-5 -bottom-0 w-2/3 h-full bg-gradient-to-r from-white",
+                                currentTimeCode() === "M" && "to-[#FFF8DC]",
+                                currentTimeCode() === "A" && "to-[#B0E0E6]",
+                                currentTimeCode() === "E" && "to-[#FFDAB9]",
+                                currentTimeCode() === "N" && "to-[#778899]"
+                            )}
+                        ></div>
+                        <div
+                            className={clsx(
+                                "z-10 absolute -right-5 -bottom-5 opacity-50",
+                                currentTimeCode() === "M" && "text-[#8B8000]",
+                                currentTimeCode() === "A" && "text-[#5F9EA0]",
+                                currentTimeCode() === "E" && "text-[#CD5C5C]",
+                                currentTimeCode() === "N" && "text-[#2F4F4F]"
+                            )}
+                        >
+                            <Clock8 size={80} />
+                        </div>
+                        <div className="relative z-10 p-1">
+                            <h3 className="font-semibold text-gray-700">
+                                Waktu Sekarang
+                            </h3>
+                            <span><b>{ymdToIdDate(currentTime, true)}</b></span>
+                        </div>
+                    </Card>
+                </div>
+                {!grantedNotif && (
+                    <div
+                        className="z-10 group relative mb-3 pb-3 cursor-pointer"
+                        onClick={hanldeRequestNotification}
+                    >
+                        <Card className="flex p-3 flex-row w-full relative overflow-hidden shadow-md">
+                            <div
+                                className={clsx(
+                                    "absolute -right-5 -bottom-0 w-2/3 h-full bg-gradient-to-r from-white to-yellow-200/50"
+                                )}
+                            ></div>
+                            <div
+                                className={clsx(
+                                    "z-10 absolute right-1.5 bottom-2 opacity-50 to-yellow-200/50"
+                                )}
+                            >
+                                <Bell size={35} />
+                            </div>
+                            <div className="relative z-10 p-1">
+                                <h3 className="font-medium group-hover:underline text-gray-700">
+                                    Izinkan Notifikasi untuk informasi absensi
+                                    harian siswa
+                                </h3>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+                <MenuListInDashboard className="mb-6" menuItems={menuItems} />
+                <div className="mt-6">
+                    <div className="mb-6">
+                        <Card className="flex p-3 flex-row w-full relative overflow-hidden shadow-md">
+                            <div
+                                className={clsx(
+                                    "absolute -right-5 -bottom-0 w-2/3 h-full bg-gradient-to-r from-white",
+                                    currentTimeCode() === "M" && "to-[#FFF8DC]",
+                                    currentTimeCode() === "A" && "to-[#B0E0E6]",
+                                    currentTimeCode() === "E" && "to-[#FFDAB9]",
+                                    currentTimeCode() === "N" && "to-[#778899]"
+                                )}
+                            ></div>
+                            <div
+                                className={clsx(
+                                    "z-10 absolute -right-3 -bottom-3 opacity-50",
+                                    currentTimeCode() === "M" &&
+                                        "text-[#8B8000]",
+                                    currentTimeCode() === "A" &&
+                                        "text-[#5F9EA0]",
+                                    currentTimeCode() === "E" &&
+                                        "text-[#CD5C5C]",
+                                    currentTimeCode() === "N" &&
+                                        "text-[#2F4F4F]"
+                                )}
+                            >
+                                <LuMapPinCheck size={80} />
+                            </div>
+                            <div className="relative z-10 p-1">
+                                <h3 className="font-semibold text-gray-700">
+                                    Absensi Harian
+                                </h3>
+                                <div className="flex flex-col text-sm">
+                                    <div>
+                                        <span className="font-semibold text-slate-700">
+                                            {data.attendances_daily?.attendances
+                                                ?.length ?? 0}{" "}
+                                            /{" "}
+                                            {
+                                                data.attendances_daily
+                                                    ?.total_students
+                                            }
+                                        </span>{" "}
+                                        Telah mengisi absensi
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold text-slate-700">
+                                            {data.attendances_daily?.attendances?.filter(
+                                                (attendance) =>
+                                                    attendance.status ===
+                                                    "EXCUSED"
+                                            ).length ?? 0}
+                                        </span>{" "}
+                                        Izin tidak hadir
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                    <div className="mb-5">
+                        {data.attendances_month.every(
+                            (attendance) =>
+                                attendance.present === 0 &&
+                                attendance.excused == 0 &&
+                                attendance.absent == 0
+                        ) ? (
+                            <ChartNoData title="Rekap Kehadiran" />
+                        ) : (
+                            <ApexBarChart
+                                title="Rekap Kehadiran"
+                                description="Rekap kehadiran siswa dalam 3 bulan"
+                                categories={attendance.categories}
+                                series={attendance.series}
+                                colors={chartColors}
+                                height={300}
+                            />
+                        )}
+                    </div>
+                    <div className="mb-5">
+                        <TableListInDashboard
+                            title="Absensi Terbaru"
+                            description="Data absensi terbaru yang tercatat"
+                            headers={["Nama Siswa", "Tanggal", "Waktu", "Status"]}
+                            headerAlign="center"
+                            cellAlign="center"
+                            columnsData={data?.latest_attendances.map(
+                                (attendance) => [
+                                    `${attendance.student?.nis} - ${attendance.student?.full_name}`,
+                                    ymdToIdDate(attendance.check_in),
+                                    ymdToIdDate(
+                                        attendance.check_in,
+                                        true,
+                                        true
+                                    ),
+                                    <StatusBadge key={attendance.id} status={attendance.status} />
+                                ]
+                            )}
+                        />
+                    </div>
+                </div>
+            </div>
+        </MainLayout>
+    );
+}

@@ -1,0 +1,106 @@
+<?php
+
+namespace App\Http\Controllers\Global;
+
+use App\Http\Controllers\Controller;
+use App\Models\GlobalSetting;
+use App\Models\Student;
+use App\Models\Supervisor;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
+
+class AuthController extends Controller
+{
+    public function SignedInStatus()
+    {
+        $auth = Auth::user();
+        if (!$auth) {
+            return Inertia::location('/auth/signin');
+        }
+
+        $role = $auth->role;
+        if ($role == 'ADMIN') {
+            return Inertia::location('/admin/dashboard');
+        }
+        if ($role == 'STUDENT') {
+            return Inertia::location('/student/dashboard');
+        }
+        if ($role == 'SUPERVISOR') {
+            return Inertia::location('/supervisor/dashboard');
+        }
+    }
+
+    public function signInView()
+    {
+        $app_setting = GlobalSetting::first();
+        return Inertia::render('Auth/SignIn', [
+            'app_name' => $app_setting ? $app_setting->app_name : config('app.name', 'Absensi Prakerin - SMK Agung Mulia'),
+        ]);
+    }
+
+    public function signIn(Request $request)
+    {
+        $request->validate([
+            'username' => 'required',
+            'password' => 'required',
+        ]);
+
+        $credentials = [
+            'username' => $request->input('username'),
+            'password' => $request->input('password'),
+        ];
+
+        $user = User::where(function ($query) use ($credentials) {
+            $query->where('username', $credentials['username'])->orWhere('email', $credentials['username']);
+        })->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            return back()->withErrors([
+                'message' => 'Username atau password salah',
+            ]);
+        }
+
+        $authCredentials = [
+            'password' => $credentials['password'],
+        ];
+
+        if (!is_null($user->username) && $user->username === $credentials['username']) {
+            $authCredentials['username'] = $user->username;
+        } else {
+            $authCredentials['email'] = $user->email;
+        }
+
+        if (Auth::attempt($authCredentials)) {
+            return Inertia::location('/');
+        }
+
+        return back()->withErrors([
+            'message' => 'Authentication failed',
+        ]);
+    }
+
+    public function signOut()
+    {
+        $role = Auth::user()->role;
+        if ($role == User::SUPERVISOR_ROLE) {
+            $supervisor = Supervisor::where('user_id', Auth::id())->first();
+            if (!$supervisor) {
+                return;
+            }
+            $supervisor->fcm_token = null;
+            $supervisor->save();
+        } elseif ($role == User::STUDENT_ROLE) {
+            $student = Student::where('user_id', Auth::id())->first();
+            if (!$student) {
+                return;
+            }
+            $student->reminder_active = 0;
+            $student->save();
+        }
+        Auth::logout();
+        return Inertia::location('/auth/signin');
+    }
+}
