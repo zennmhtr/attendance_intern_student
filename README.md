@@ -1,10 +1,10 @@
-# PKL Absensi
+# Siswa PKL Absensi
 
-PKL Absensi is a web-based attendance application that utilizes GPS lock radius and specific coordinates to ensure accurate location-based attendance tracking.
+Siswa PKL Absensi is a web-based attendance application that utilizes GPS lock radius and specific coordinates to ensure accurate location-based attendance tracking.
 
 ## Author
 
-This project is developed by [dendik-creation](https://github.com/dendik-creation).
+This project is developed by [zennmhtr](https://github.com/zennmhtr).
 
 ## Tech Stack
 
@@ -41,8 +41,8 @@ Ensure you have the following installed:
 1. **Clone the Repository**
 
     ```bash
-    git clone https://github.com/dendik-creation/pkl-absensi.git
-    cd pkl-absensi/pkl-absensi
+    git clone https://github.com/zennmhtr/attendance_intern_student.git
+    cd attendance_intern_student/attendance_intern_student
     ```
 
 2. **Install Backend Dependencies**
@@ -91,7 +91,3 @@ Ensure you have the following installed:
 -   GPS-based attendance tracking
 -   Radius lock for location validation
 -   Interactive map integration using React-Leaflet
-
-## License
-
-This project is licensed under the MIT License.
